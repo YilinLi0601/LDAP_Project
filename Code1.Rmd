@@ -17,7 +17,7 @@ wave1 <- covid_19_wave1_survey_cls
 wave2 <- covid_19_wave2_survey_cls
 wave3 <- covid_19_wave3_survey_cls
 ```
-## Exploring dataset
+## Exploring dataset, picking the data going to be used in later analysis
 ```{r}
 wave1 <- wave1 %>%
   select(NCDSID, CW1_COVID19, CW1_COVID_HOSPAD, CW1_GHQ, CW1_HHNUM, CW1_FINANCIALMANB, CW1_FINANCIALMAND, CW1_MALAISE_1, CW1_MALAISE_2, CW1_MALAISE_3, CW1_MALAISE_4, CW1_MALAISE_5, CW1_MALAISE_6, CW1_MALAISE_7, CW1_MALAISE_8, CW1_MALAISE_9, CW1_GAD2PHQ2_1, CW1_GAD2PHQ2_2, CW1_GAD2PHQ2_3, CW1_GAD2PHQ2_4)
