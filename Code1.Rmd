@@ -26,4 +26,33 @@ wave2 <- wave2 %>%
 wave3 <- wave3 %>%
   select(NCDSID, CW3_COVID19, CW3_COVID_HOSPAD, CW3_GHQ, CW3_HHNUM, CW3_FINANCIALMANB, CW3_FINANCIALMAND, CW3_MALAISE_1, CW3_MALAISE_2, CW3_MALAISE_3, CW3_MALAISE_4, CW3_MALAISE_5, CW3_MALAISE_6, CW3_MALAISE_7, CW3_MALAISE_8, CW3_MALAISE_9, CW3_GAD2PHQ2_1, CW3_GAD2PHQ2_2, CW3_GAD2PHQ2_3, CW3_GAD2PHQ2_4)
 ```
+## Data cleaning, maybe we should filter out everyone who does not have a participant ID?
+```{r}
+wave1 <- wave1 %>%
+  filter(NCDSID != "")
+wave2 <- wave2 %>%
+  filter(NCDSID != "")
+wave3 <- wave3 %>%
+  filter(NCDSID != "")
+```
+## I filtered all participants who participated in all three waves of data collections. Now we can look at longitudinal effects.
+```{r}
+common_ids <- reduce(list(wave1$NCDSID, wave2$NCDSID, wave3$NCDSID), intersect)
+wave1_com <- wave1 %>%
+  filter(NCDSID %in% common_ids)
+wave2_com <- wave2 %>%
+  filter(NCDSID %in% common_ids)
+wave3_com <- wave3 %>%
+  filter(NCDSID %in% common_ids)
+```
+## Specifying waves, preparing for pivot_long
+```{r}
+wave1_com <- wave1_com %>%
+  mutate(wave = 1)
+wave2_com <- wave2_com %>%
+  mutate(wave =2)
+wave3_com <- wave3_com %>%
+  mutate(wave = 3)
+
+```
 
