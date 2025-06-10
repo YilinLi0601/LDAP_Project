@@ -63,7 +63,7 @@ wave3_com <- wave3_com %>%
 long <- bind_rows(wave1_com, wave2_com, wave3_com)
 
 ```
-## Changing labels and values, calculating mental health scores.
+## Changing labels and values, calculating mental health scores. Creating a new data frame finalised for analysis. 
 ```{r}
 str(long$COVID19)
 long <- long %>%
@@ -83,5 +83,6 @@ long <- long %>%
   mutate(GAD = sum(GAD2PHQ2_1, GAD2PHQ2_2, GAD2PHQ2_3, GAD2PHQ2_4, na.rm = FALSE))
 clean <- long %>%
   select(NCDSID, GHQ, HHNUM, wave, covid_positive, hospitalise, malaise, GAD)
+# Finalised dataframe for multi-level analysis: clean
 ```
 
