@@ -63,4 +63,24 @@ wave3_com <- wave3_com %>%
 long <- bind_rows(wave1_com, wave2_com, wave3_com)
 
 ```
+## Changing labels and values, calculating mental health scores.
+```{r}
+str(long$COVID19)
+long <- long %>%
+  mutate(covid_positive = case_when(
+      COVID19 == 1 ~ 1,
+      COVID19 == 2 ~ 1,
+      COVID19 %in% c(3, 4) ~ 0,
+      TRUE ~ NA_real_)) %>%
+  mutate(hospitalise = case_when(
+    COVID_HOSPAD %in% NA ~ 0,
+    COVID_HOSPAD == 2 ~ 0,
+    COVID_HOSPAD == 1 ~ 1
+  )) %>%
+  rowwise() %>%
+  mutate(malaise = sum(MALAISE_1, MALAISE_2, MALAISE_3, MALAISE_4, MALAISE_5, MALAISE_6, MALAISE_7, MALAISE_8, MALAISE_9, na.rm = FALSE)) %>%
+  rowwise() %>%
+  mutate(GAD = sum(GAD2PHQ2_1, GAD2PHQ2_2, GAD2PHQ2_3, GAD2PHQ2_4, na.rm = FALSE))
+
+```
 
