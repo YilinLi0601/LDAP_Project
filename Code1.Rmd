@@ -81,6 +81,7 @@ long <- long %>%
   mutate(malaise = sum(MALAISE_1, MALAISE_2, MALAISE_3, MALAISE_4, MALAISE_5, MALAISE_6, MALAISE_7, MALAISE_8, MALAISE_9, na.rm = FALSE)) %>%
   rowwise() %>%
   mutate(GAD = sum(GAD2PHQ2_1, GAD2PHQ2_2, GAD2PHQ2_3, GAD2PHQ2_4, na.rm = FALSE))
-
+clean <- long %>%
+  select(NCDSID, GHQ, HHNUM, wave, covid_positive, hospitalise, malaise, GAD)
 ```
 
