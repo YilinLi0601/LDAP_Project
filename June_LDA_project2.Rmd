@@ -1,0 +1,677 @@
+---
+title: "Code1"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+date: "2025-05-06"
+---
+
+# Settings
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+# Reading data frames
+
+```{r}
+library(foreign)
+library(tidyverse)
+library(dplyr)
+library(knitr)
+library(lme4)      # For mixed-effects models
+library(lmerTest)  # For p-values in mixed models
+library(broom)     # For tidy model outputs
+library(broom.mixed) # For mixed model outputs
+library(corrr)  # For correlation analysis
+library(mediation)
+library(lavaan)       # For SEM approach (alternative)
+library(knitr)
+library(haven)
+library("dagitty")
+library("semPlot")
+setwd("~/Desktop/LDAP_Project")
+covid_19_wave1_survey_cls <- read_sav("covid-19_wave1_survey_cls.sav")
+wave1 <- covid_19_wave1_survey_cls
+covid_19_wave2_survey_cls <- read_sav("covid-19_wave2_survey_cls.sav")
+wave2 <- covid_19_wave2_survey_cls
+covid_19_wave3_survey_cls <- read_sav("covid-19_wave3_survey_cls.sav")
+wave3 <- covid_19_wave3_survey_cls
+```
+
+# Picking variables
+
+```{r}
+wave1 <- wave1 %>%
+  dplyr::select(NCDSID, CW1_COVID19, CW1_COVID_HOSPAD, CW1_GHQ, CW1_HHNUM, CW1_MALAISE_1, CW1_MALAISE_2, CW1_MALAISE_3, CW1_MALAISE_4, CW1_MALAISE_5, CW1_MALAISE_6, CW1_MALAISE_7, CW1_MALAISE_8, CW1_MALAISE_9, CW1_GAD2PHQ2_1, CW1_GAD2PHQ2_2, CW1_GAD2PHQ2_3, CW1_GAD2PHQ2_4, CW1_LONELY_1, CW1_LONELY_2, CW1_LONELY_3, CW1_LONELY_4)
+wave2 <- wave2 %>%
+  dplyr::select(NCDSID, CW2_COVID19, CW2_COVID_HOSPAD, CW2_GHQ, CW2_HHNUM, CW2_MALAISE_1, CW2_MALAISE_2, CW2_MALAISE_3, CW2_MALAISE_4, CW2_MALAISE_5, CW2_MALAISE_6, CW2_MALAISE_7, CW2_MALAISE_8, CW2_MALAISE_9, CW2_GAD2PHQ2_1, CW2_GAD2PHQ2_2, CW2_GAD2PHQ2_3, CW2_GAD2PHQ2_4, CW2_LONELY_1, CW2_LONELY_2, CW2_LONELY_3, CW2_LONELY_4)
+wave3 <- wave3 %>%
+  dplyr::select(NCDSID, CW3_COVID19, CW3_COVID_HOSPAD, CW3_GHQ, CW3_HHNUM, CW3_MALAISE_1, CW3_MALAISE_2, CW3_MALAISE_3, CW3_MALAISE_4, CW3_MALAISE_5, CW3_MALAISE_6, CW3_MALAISE_7, CW3_MALAISE_8, CW3_MALAISE_9, CW3_GAD2PHQ2_1, CW3_GAD2PHQ2_2, CW3_GAD2PHQ2_3, CW3_GAD2PHQ2_4, CW3_LONELY_1, CW3_LONELY_2, CW3_LONELY_3, CW3_LONELY_4)
+```
+
+# Data cleaning
+
+```{r}
+wave1 <- wave1 %>%
+  filter(NCDSID != "")
+wave2 <- wave2 %>%
+  filter(NCDSID != "")
+wave3 <- wave3 %>%
+  filter(NCDSID != "")
+```
+
+# Data filtering
+
+```{r}
+common_ids <- reduce(list(wave1$NCDSID, wave2$NCDSID, wave3$NCDSID), intersect)
+wave1_com <- wave1 %>%
+  filter(NCDSID %in% common_ids)
+wave2_com <- wave2 %>%
+  filter(NCDSID %in% common_ids)
+wave3_com <- wave3 %>%
+  filter(NCDSID %in% common_ids)
+```
+
+# Specifying waves and long format
+
+```{r}
+wave1_com <- wave1_com %>%
+  mutate(wave = 1)
+wave2_com <- wave2_com %>%
+  mutate(wave =2)
+wave3_com <- wave3_com %>%
+  mutate(wave = 3)
+
+wave1_com <- wave1_com %>%
+  rename(COVID19 = CW1_COVID19, COVID_HOSPAD = CW1_COVID_HOSPAD, GHQ = CW1_GHQ, HHNUM = CW1_HHNUM, MALAISE_1 = CW1_MALAISE_1, MALAISE_2 = CW1_MALAISE_2, MALAISE_3 = CW1_MALAISE_3, MALAISE_4 = CW1_MALAISE_4, MALAISE_5 = CW1_MALAISE_5, MALAISE_6 = CW1_MALAISE_6, MALAISE_7 = CW1_MALAISE_7, MALAISE_8 = CW1_MALAISE_8, MALAISE_9 = CW1_MALAISE_9, GAD2PHQ2_1 = CW1_GAD2PHQ2_1, GAD2PHQ2_2 = CW1_GAD2PHQ2_2, GAD2PHQ2_3 = CW1_GAD2PHQ2_3, GAD2PHQ2_4 = CW1_GAD2PHQ2_4, LONELY_1 = CW1_LONELY_1, LONELY_2 = CW1_LONELY_2, LONELY_3 = CW1_LONELY_3, LONELY_4 = CW1_LONELY_4)
+wave2_com <- wave2_com %>%
+  rename(COVID19 = CW2_COVID19, COVID_HOSPAD = CW2_COVID_HOSPAD, GHQ = CW2_GHQ, HHNUM = CW2_HHNUM, MALAISE_1 = CW2_MALAISE_1, MALAISE_2 = CW2_MALAISE_2, MALAISE_3 = CW2_MALAISE_3, MALAISE_4 = CW2_MALAISE_4, MALAISE_5 = CW2_MALAISE_5, MALAISE_6 = CW2_MALAISE_6, MALAISE_7 = CW2_MALAISE_7, MALAISE_8 = CW2_MALAISE_8, MALAISE_9 = CW2_MALAISE_9, GAD2PHQ2_1 = CW2_GAD2PHQ2_1, GAD2PHQ2_2 = CW2_GAD2PHQ2_2, GAD2PHQ2_3 = CW2_GAD2PHQ2_3, GAD2PHQ2_4 = CW2_GAD2PHQ2_4, LONELY_1 = CW2_LONELY_1, LONELY_2 = CW2_LONELY_2, LONELY_3 = CW2_LONELY_3, LONELY_4 = CW2_LONELY_4)
+wave3_com <- wave3_com %>%
+  rename(COVID19 = CW3_COVID19, COVID_HOSPAD = CW3_COVID_HOSPAD, GHQ = CW3_GHQ, HHNUM = CW3_HHNUM, MALAISE_1 = CW3_MALAISE_1, MALAISE_2 = CW3_MALAISE_2, MALAISE_3 = CW3_MALAISE_3, MALAISE_4 = CW3_MALAISE_4, MALAISE_5 = CW3_MALAISE_5, MALAISE_6 = CW3_MALAISE_6, MALAISE_7 = CW3_MALAISE_7, MALAISE_8 = CW3_MALAISE_8, MALAISE_9 = CW3_MALAISE_9, GAD2PHQ2_1 = CW3_GAD2PHQ2_1, GAD2PHQ2_2 = CW3_GAD2PHQ2_2, GAD2PHQ2_3 = CW3_GAD2PHQ2_3, GAD2PHQ2_4 = CW3_GAD2PHQ2_4, LONELY_1 = CW3_LONELY_1, LONELY_2 = CW3_LONELY_2, LONELY_3 = CW3_LONELY_3, LONELY_4 = CW3_LONELY_4)
+long <- bind_rows(wave1_com, wave2_com, wave3_com)
+
+```
+
+# Changing labels, calculating values
+
+```{r}
+str(long$COVID19)
+long <- long %>%
+  mutate(covid_positive = case_when(
+      COVID19 == 1 ~ 1,
+      COVID19 == 2 ~ 1,
+      COVID19 %in% c(3, 4) ~ 0,
+      TRUE ~ NA_real_)) %>%
+  mutate(hospitalise = case_when(
+    COVID_HOSPAD %in% NA ~ 0,
+    COVID_HOSPAD == 2 ~ 0,
+    COVID_HOSPAD == 1 ~ 1
+  )) %>%
+  rowwise() %>%
+  mutate(malaise = sum(MALAISE_1, MALAISE_2, MALAISE_3, MALAISE_4, MALAISE_5, MALAISE_6, MALAISE_7, MALAISE_8, MALAISE_9, na.rm = FALSE)) %>%
+  rowwise() %>%
+  mutate(
+    GAD = sum(GAD2PHQ2_1, GAD2PHQ2_2, GAD2PHQ2_3, GAD2PHQ2_4, na.rm = FALSE)) %>%
+  rowwise() %>%
+  mutate(
+    LONELY = sum(LONELY_1, LONELY_2, LONELY_3, LONELY_4)
+  )
+clean <- long %>%
+  dplyr::select(NCDSID, GHQ, HHNUM, wave, covid_positive, hospitalise, malaise, GAD, LONELY)
+# Finalised dataframe for multi-level analysis: clean
+```
+
+# Descriptive Stats
+## 1. OVERALL SAMPLE CHARACTERISTICS
+```{r}
+# 1. OVERALL SAMPLE CHARACTERISTICS
+cat("=== OVERALL SAMPLE CHARACTERISTICS ===\n")
+cat("Total observations:", nrow(clean), "\n")
+cat("Unique participants:", length(unique(clean$NCDSID)), "\n")
+cat("Observations per wave:\n")
+print(table(clean$wave))
+```
+## 2. DESCRIPTIVE STATISTICS BY WAVE
+```{r}
+# 2. DESCRIPTIVE STATISTICS BY WAVE
+cat("\n=== DESCRIPTIVE STATISTICS BY WAVE ===\n")
+
+# Function to calculate descriptive stats
+desc_stats <- function(x) {
+  c(
+    N = sum(!is.na(x)),
+    Mean = round(mean(x, na.rm = TRUE), 2),
+    SD = round(sd(x, na.rm = TRUE), 2),
+    Min = min(x, na.rm = TRUE),
+    Q1 = quantile(x, 0.25, na.rm = TRUE),
+    Median = median(x, na.rm = TRUE),
+    Q3 = quantile(x, 0.75, na.rm = TRUE),
+    Max = max(x, na.rm = TRUE),
+    Missing = sum(is.na(x))
+  )
+}
+
+# Continuous variables by wave
+continuous_vars <- c("GHQ", "malaise", "GAD", "LONELY")
+
+desc_by_wave <- clean %>%
+  group_by(wave) %>%
+  summarise(
+    across(all_of(continuous_vars), desc_stats, .names = "{.col}_{.fn}"),
+    .groups = "drop"
+  )
+
+# Rename columns for better display
+colnames(desc_by_wave) <- gsub("GHQ", "General Health Questionnaire", colnames(desc_by_wave))
+colnames(desc_by_wave) <- gsub("malaise", "Post COVID-19 Symptoms", colnames(desc_by_wave))
+colnames(desc_by_wave) <- gsub("GAD", "Generalised Anxiety Disorder", colnames(desc_by_wave))
+colnames(desc_by_wave) <- gsub("LONELY", "Loneliness Scale", colnames(desc_by_wave))
+
+
+print(desc_by_wave)
+```
+## 3. CATEGORICAL VARIABLES BY WAVE
+```{r}
+# 3. CATEGORICAL VARIABLES BY WAVE
+cat("\n=== CATEGORICAL VARIABLES BY WAVE ===\n")
+
+# COVID-19 positive cases by wave
+cat("Covid Positive Cases by Wave:\n")
+covid_table <- clean %>%
+  group_by(wave, covid_positive) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  pivot_wider(names_from = covid_positive, values_from = n, values_fill = 0) %>%
+  mutate(
+    Total = `0` + `1`,
+    Percent_Positive = round((`1` / Total) * 100, 1)
+  )
+print(covid_table)
+
+# Hospitalization by wave
+cat("\nHospitalised by Wave:\n")
+hosp_table <- clean %>%
+  group_by(wave, hospitalise) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  pivot_wider(names_from = hospitalise, values_from = n, values_fill = 0) %>%
+  mutate(
+    Total = `0` + `1`,
+    Percent_Hospitalised = round((`1` / Total) * 100, 1)
+  )
+print(hosp_table)
+
+# Household number distribution by wave
+cat("\nHousehold Number Distribution by Wave:\n")
+hhnum_summary <- clean %>%
+  group_by(wave) %>%
+  summarise(
+    N = n(),
+    Mean_HHNUM = round(mean(HHNUM, na.rm = TRUE), 2),
+    SD_HHNUM = round(sd(HHNUM, na.rm = TRUE), 2),
+    Min_HHNUM = min(HHNUM, na.rm = TRUE),
+    Max_HHNUM = max(HHNUM, na.rm = TRUE),
+    .groups = "drop"
+  )
+print(hhnum_summary)
+```
+## 4. DETAILED FREQUENCY TABLES
+```{r}
+# 4. DETAILED FREQUENCY TABLES
+cat("\n=== DETAILED FREQUENCY TABLES ===\n")
+
+# GHQ scores by wave
+cat("GHQ Score Distribution by Wave:\n")
+ghq_freq <- clean %>%
+  group_by(wave, GHQ) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(wave) %>%
+  mutate(
+    percent = round((n / sum(n)) * 100, 1),
+    cum_percent = round(cumsum(percent), 1)
+  )
+print(ghq_freq)
+
+# Malaise scores by wave (showing ranges to make it manageable)
+cat("\nMalaise Score Ranges by Wave:\n")
+malaise_ranges <- clean %>%
+  mutate(
+    malaise_range = case_when(
+      malaise <= 2 ~ "0-2 (Low)",
+      malaise <= 5 ~ "3-5 (Moderate)",
+      malaise <= 8 ~ "6-8 (High)",
+      malaise >= 9 ~ "9+ (Very High)",
+      TRUE ~ "Missing"
+    )
+  ) %>%
+  group_by(wave, malaise_range) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(wave) %>%
+  mutate(percent = round((n / sum(n)) * 100, 1))
+print(malaise_ranges)
+
+# GAD scores by wave
+cat("\nGAD Score Distribution by Wave:\n")
+gad_freq <- clean %>%
+  group_by(wave, GAD) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(wave) %>%
+  mutate(
+    percent = round((n / sum(n)) * 100, 1),
+    cum_percent = round(cumsum(percent), 1)
+  )
+print(gad_freq)
+```
+## 5. CORRELATION MATRIX BY WAVE
+```{r}
+
+# 5. CORRELATION MATRIX BY WAVE
+cat("\n=== CORRELATION MATRICES BY WAVE ===\n")
+
+cor_matrices <- list()
+for(w in 1:3) {
+  wave_data <- clean
+  cor_vars <- c("GHQ", "malaise", "GAD", "LONELY", "covid_positive", "hospitalise")
+  cor_matrix <- cor(wave_data[cor_vars], use = "pairwise.complete.obs")
+  rownames(cor_matrix) <- colnames(cor_matrix) <- c(
+    "General Health Questionnaire", "Post COVID-19 Symptoms", 
+    "Generalised Anxiety Disorder", "Loneliness Scale", 
+    "Covid Positive", "Hospitalised"
+  )
+  cor_matrices[[paste0("Wave", w)]] <- cor_matrix
+}
+print(cor_matrices)
+```
+## 6. MISSING DATA ANALYSIS
+```{r}
+# 6. MISSING DATA ANALYSIS
+cat("\n=== MISSING DATA ANALYSIS ===\n")
+missing_analysis <- clean %>%
+  group_by(wave) %>%
+  summarise(
+    N_total = n(),
+    GHQ_missing = sum(is.na(GHQ)),
+    malaise_missing = sum(is.na(malaise)),
+    GAD_missing = sum(is.na(GAD)),
+    LONELY_missing = sum(is.na(LONELY)),
+    covid_positive_missing = sum(is.na(covid_positive)),
+    hospitalise_missing = sum(is.na(hospitalise)),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    across(ends_with("_missing"), ~ round((. / N_total) * 100, 1), .names = "{.col}_percent")
+  )
+print(missing_analysis)
+```
+## 7. SUMMARY TABLE FOR PUBLICATION
+```{r}
+# 7. SUMMARY TABLE FOR PUBLICATION
+cat("\n=== PUBLICATION-READY SUMMARY TABLE ===\n")
+pub_table <- clean %>%
+  group_by(wave) %>%
+  summarise(
+    N = n(),
+    
+    # Continuous variables: Mean (SD)
+    GHQ_mean_sd = paste0(round(mean(GHQ, na.rm = TRUE), 2), " (", 
+                         round(sd(GHQ, na.rm = TRUE), 2), ")"),
+    
+    malaise_mean_sd = paste0(round(mean(malaise, na.rm = TRUE), 2), " (", 
+                            round(sd(malaise, na.rm = TRUE), 2), ")"),
+    
+    GAD_mean_sd = paste0(round(mean(GAD, na.rm = TRUE), 2), " (", 
+                         round(sd(GAD, na.rm = TRUE), 2), ")"),
+    
+    LONELY_mean_sd = paste0(round(mean(LONELY, na.rm = TRUE), 2), " (", 
+                            round(sd(LONELY, na.rm = TRUE), 2), ")"),
+    
+    # Categorical variables: n (%)
+    COVID_positive = paste0(sum(covid_positive == 1, na.rm = TRUE), " (", 
+                           round((sum(covid_positive == 1, na.rm = TRUE) / n()) * 100, 1), "%)"),
+    
+    Hospitalized = paste0(sum(hospitalise == 1, na.rm = TRUE), " (", 
+                         round((sum(hospitalise == 1, na.rm = TRUE) / n()) * 100, 1), "%)"),
+    
+    .groups = "drop"
+  )
+
+print(pub_table)
+
+cat("\n=== ANALYSIS COMPLETE ===\n")
+cat("This comprehensive descriptive analysis provides:\n")
+cat("1. Overall sample characteristics\n")
+cat("2. Descriptive statistics by wave for continuous variables\n")
+cat("3. Frequency distributions for categorical variables\n")
+cat("4. Detailed frequency tables\n")
+cat("5. Correlation matrices by wave\n")
+cat("6. Missing data analysis\n")
+cat("7. Publication-ready summary table\n")
+```
+
+```{r}
+library(knitr)
+ggplot(clean, 
+             aes(x = wave, y = GAD)) +
+  geom_violin(alpha = 0.1) +
+  stat_summary()
+
+
+
+```
+
+
+# Check the correlation / relationship between variables
+
+## Hypothesis 1: Having COVID will predict poorer mental health
+## Hypothesis 2: COVID severity predicts poorer mental health
+```{r}
+cat("=== COVID-19 AND MENTAL HEALTH PREDICTIVE ANALYSIS ===\n\n")
+
+# 1. DESCRIPTIVE COMPARISONS: COVID vs NO-COVID
+cat("1. DESCRIPTIVE COMPARISONS BY COVID STATUS\n")
+cat("=========================================\n")
+
+# Create comparison table
+covid_comparison <- clean %>%
+  group_by(covid_positive) %>%
+  summarise(
+    N = n(),
+    N_unique_participants = n_distinct(NCDSID),
+    
+    # Mental health outcomes
+    `General Health Questionnaire` = paste0(round(mean(GHQ, na.rm = TRUE), 2), " (", 
+                                           round(sd(GHQ, na.rm = TRUE), 2), ")"),
+    
+    `Post COVID-19 Symptoms` = paste0(round(mean(malaise, na.rm = TRUE), 2), " (", 
+                                     round(sd(malaise, na.rm = TRUE), 2), ")"),
+    
+    `Generalised Anxiety Disorder` = paste0(round(mean(GAD, na.rm = TRUE), 2), " (", 
+                                           round(sd(GAD, na.rm = TRUE), 2), ")"),
+    
+    `Loneliness Scale` = paste0(round(mean(LONELY, na.rm = TRUE), 2), " (", 
+                               round(sd(LONELY, na.rm = TRUE), 2), ")"),
+    
+    `Hospitalised Rate` = paste0(sum(hospitalise == 1, na.rm = TRUE), " (", 
+                                round((sum(hospitalise == 1, na.rm = TRUE) / n()) * 100, 1), "%)"),
+    
+    .groups = "drop"
+  ) %>%
+  mutate(covid_positive = ifelse(covid_positive == 1, "Covid Positive", "Covid Negative"))
+
+print(covid_comparison)
+
+```
+## 2. SIMPLE T-TESTS FOR EACH MENTAL HEALTH OUTCOME
+```{r}
+cat("\n\n2. T-TESTS: COVID POSITIVE vs COVID NEGATIVE\n")
+cat("===========================================\n")
+
+mental_health_vars <- c("GHQ", "malaise", "GAD", "LONELY")
+var_labels <- c("General Health Questionnaire", "Post COVID-19 Symptoms", 
+                "Generalised Anxiety Disorder", "Loneliness Scale")
+
+ttest_results <- tibble()
+
+for(i in 1:length(mental_health_vars)) {
+  var <- mental_health_vars[i]
+  label <- var_labels[i]
+  
+  # Perform t-test
+  covid_pos <- clean %>% filter(covid_positive == 1) %>% pull(!!sym(var))
+  covid_neg <- clean %>% filter(covid_positive == 0) %>% pull(!!sym(var))
+  
+  test_result <- t.test(covid_pos, covid_neg, na.rm = TRUE)
+  
+  # Calculate effect size (Cohen's d)
+  pooled_sd <- sqrt(((length(covid_pos)-1)*var(covid_pos, na.rm=TRUE) + 
+                     (length(covid_neg)-1)*var(covid_neg, na.rm=TRUE)) / 
+                    (length(covid_pos) + length(covid_neg) - 2))
+  cohens_d <- (mean(covid_pos, na.rm=TRUE) - mean(covid_neg, na.rm=TRUE)) / pooled_sd
+  
+  ttest_results <- bind_rows(ttest_results, 
+                            tibble(
+                              Variable = label,
+                              COVID_Mean = round(mean(covid_pos, na.rm=TRUE), 2),
+                              No_COVID_Mean = round(mean(covid_neg, na.rm=TRUE), 2),
+                              Difference = round(COVID_Mean - No_COVID_Mean, 2),
+                              t_statistic = round(test_result$statistic, 3),
+                              p_value = round(test_result$p.value, 4),
+                              Cohens_d = round(cohens_d, 3),
+                              Effect_Size = case_when(
+                                abs(cohens_d) < 0.2 ~ "Negligible",
+                                abs(cohens_d) < 0.5 ~ "Small",
+                                abs(cohens_d) < 0.8 ~ "Medium",
+                                TRUE ~ "Large"
+                              )
+                            ))
+}
+
+print(ttest_results)
+```
+## 3. LONGITUDINAL MIXED-EFFECTS MODELS
+```{r}
+cat("\n\n3. MIXED-EFFECTS MODELS: LONGITUDINAL ANALYSIS\n")
+cat("==============================================\n")
+
+# Create models for each mental health outcome
+mixed_model_results <- tibble()
+
+for(i in 1:length(mental_health_vars)) {
+  var <- mental_health_vars[i]
+  label <- var_labels[i]
+  
+  cat(paste("\nAnalyzing:", label, "\n"))
+  
+  # Basic model: COVID effect with random intercepts
+  formula_basic <- as.formula(paste(var, "~ covid_positive + wave + (1|NCDSID)"))
+  model_basic <- lmer(formula_basic, data = clean, REML = FALSE)
+  
+  # Enhanced model: Include hospitalization
+  formula_enhanced <- as.formula(paste(var, "~ covid_positive + hospitalise + wave + (1|NCDSID)"))
+  model_enhanced <- lmer(formula_enhanced, data = clean, REML = FALSE)
+  
+  # Extract results
+  basic_summary <- tidy(model_basic, conf.int = TRUE)
+  enhanced_summary <- tidy(model_enhanced, conf.int = TRUE)
+  
+  # Focus on COVID effect
+  covid_effect_basic <- basic_summary %>% filter(term == "covid_positive")
+  covid_effect_enhanced <- enhanced_summary %>% filter(term == "covid_positive")
+  hosp_effect <- enhanced_summary %>% filter(term == "hospitalise")
+  
+  # Store results
+  if(nrow(covid_effect_basic) > 0) {
+    mixed_model_results <- bind_rows(mixed_model_results,
+                                   tibble(
+                                     Variable = label,
+                                     Model = "Basic (COVID + Wave)",
+                                     COVID_Coefficient = round(covid_effect_basic$estimate, 3),
+                                     COVID_SE = round(covid_effect_basic$std.error, 3),
+                                     COVID_p_value = round(covid_effect_basic$p.value, 4),
+                                     COVID_CI_lower = round(covid_effect_basic$conf.low, 3),
+                                     COVID_CI_upper = round(covid_effect_basic$conf.high, 3)
+                                   ))
+  }
+  
+  if(nrow(covid_effect_enhanced) > 0) {
+    mixed_model_results <- bind_rows(mixed_model_results,
+                                   tibble(
+                                     Variable = label,
+                                     Model = "Enhanced (+ Hospitalization)",
+                                     COVID_Coefficient = round(covid_effect_enhanced$estimate, 3),
+                                     COVID_SE = round(covid_effect_enhanced$std.error, 3),
+                                     COVID_p_value = round(covid_effect_enhanced$p.value, 4),
+                                     COVID_CI_lower = round(covid_effect_enhanced$conf.low, 3),
+                                     COVID_CI_upper = round(covid_effect_enhanced$conf.high, 3)
+                                   ))
+  }
+  
+  # Print model comparison
+  cat("Basic Model AIC:", round(AIC(model_basic), 2), "\n")
+  cat("Enhanced Model AIC:", round(AIC(model_enhanced), 2), "\n")
+  if(nrow(hosp_effect) > 0) {
+    cat("Hospitalization Effect: β =", round(hosp_effect$estimate, 3), 
+        ", p =", round(hosp_effect$p.value, 4), "\n")
+  }
+}
+
+print(mixed_model_results)
+```
+## 4. TIMING ANALYSIS: WHEN DO EFFECTS APPEAR?
+```{r}
+cat("\n\n4. TIMING ANALYSIS: COVID EFFECTS BY WAVE\n")
+cat("========================================\n")
+
+# Analyze COVID effects within each wave
+wave_analysis <- tibble()
+
+for(wave_num in 1:3) {
+  cat(paste("\nWave", wave_num, "Analysis:\n"))
+  
+  wave_data <- clean %>% filter(wave == wave_num)
+  
+  for(i in 1:length(mental_health_vars)) {
+    var <- mental_health_vars[i]
+    label <- var_labels[i]
+    
+    if(sum(!is.na(wave_data[[var]])) > 10) {  # Ensure sufficient data
+      covid_pos <- wave_data %>% filter(covid_positive == 1) %>% pull(!!sym(var))
+      covid_neg <- wave_data %>% filter(covid_positive == 0) %>% pull(!!sym(var))
+      
+      if(length(covid_pos) > 0 & length(covid_neg) > 0) {
+        test_result <- t.test(covid_pos, covid_neg)
+        
+        wave_analysis <- bind_rows(wave_analysis,
+                                 tibble(
+                                   Wave = wave_num,
+                                   Variable = label,
+                                   COVID_Mean = round(mean(covid_pos, na.rm=TRUE), 2),
+                                   No_COVID_Mean = round(mean(covid_neg, na.rm=TRUE), 2),
+                                   Difference = round(COVID_Mean - No_COVID_Mean, 2),
+                                   p_value = round(test_result$p.value, 4),
+                                   Significant = ifelse(test_result$p.value < 0.05, "Yes", "No")
+                                 ))
+      }
+    }
+  }
+}
+
+print(wave_analysis)
+```
+## 5. HOSPITALIZATION AS SEVERITY INDICATOR
+```{r}
+cat("\n\n5. DOSE-RESPONSE ANALYSIS: COVID SEVERITY EFFECTS\n")
+cat("================================================\n")
+
+# Create COVID severity groups
+clean_severity <- clean %>%
+  mutate(
+    covid_severity = case_when(
+      covid_positive == 0 ~ "No COVID",
+      covid_positive == 1 & hospitalise == 0 ~ "COVID - Not Hospitalized",
+      covid_positive == 1 & hospitalise == 1 ~ "COVID - Hospitalized",
+      TRUE ~ "Unknown"
+    )
+  ) %>%
+  filter(covid_severity != "Unknown")
+
+# ANOVA for each mental health variable
+severity_results <- tibble()
+
+for(i in 1:length(mental_health_vars)) {
+  var <- mental_health_vars[i]
+  label <- var_labels[i]
+  
+  # Perform ANOVA
+  formula_anova <- as.formula(paste(var, "~ covid_severity"))
+  anova_result <- aov(formula_anova, data = clean_severity)
+  anova_summary <- summary(anova_result)
+  
+  # Post-hoc comparisons
+  severity_means <- clean_severity %>%
+    group_by(covid_severity) %>%
+    summarise(
+      N = n(),
+      Mean = round(mean(!!sym(var), na.rm = TRUE), 2),
+      SD = round(sd(!!sym(var), na.rm = TRUE), 2),
+      .groups = "drop"
+    )
+  
+  cat(paste("\n", label, "by COVID Severity:\n"))
+  print(severity_means)
+  
+  f_statistic <- anova_summary[[1]][["F value"]][1]
+  p_value <- anova_summary[[1]][["Pr(>F)"]][1]
+  
+  cat("F-statistic:", round(f_statistic, 3), ", p-value:", round(p_value, 4), "\n")
+}
+```
+## 6. SUMMARY AND INTERPRETATION
+```{r}
+cat("\n\n6. SUMMARY AND INTERPRETATION\n")
+cat("=============================\n")
+
+cat("Key Findings:\n")
+cat("1. Descriptive comparisons show mean differences between COVID+ and COVID- groups\n")
+cat("2. T-tests provide statistical significance and effect sizes for group differences\n")
+cat("3. Mixed-effects models account for repeated measures and individual differences\n")
+cat("4. Wave-by-wave analysis shows when effects emerge or persist\n")
+cat("5. Severity analysis tests dose-response relationship\n\n")
+
+cat("Interpretation Guide:\n")
+cat("- Positive coefficients = COVID associated with WORSE mental health\n")
+cat("- Negative coefficients = COVID associated with BETTER mental health\n")
+cat("- p < 0.05 = statistically significant effect\n")
+cat("- Cohen's d: 0.2=small, 0.5=medium, 0.8=large effect\n\n")
+
+cat("Next Steps:\n")
+cat("1. Check model assumptions (residuals, normality)\n")
+cat("2. Consider additional covariates (age, gender, SES)\n")
+cat("3. Test for interaction effects (COVID × time)\n")
+cat("4. Consider lagged effects (COVID in wave X predicting MH in wave X+1)\n")
+
+cat("\n=== ANALYSIS COMPLETE ===\n")
+```
+# Hypothesis 3: Lonliness is a mediator between the relationship of COVID positivity and mental health (general anxiety & malaise).
+# SEM model with mediation
+```{r}
+cat("Running SEM analysis to explore direct effect (COVID positive on loneliness, anxiety and malaise.")
+library(lavaan)
+
+sem_model <- '
+  # Mediation path
+  LONELY ~ a * covid_positive
+  
+  # Outcomes with both direct and indirect paths
+  GAD ~ b1 * LONELY + c1 * covid_positive
+  malaise ~ b2 * LONELY + c2 * covid_positive
+
+  # Indirect effects
+  indirect_GAD := a * b1
+  indirect_malaise := a * b2
+
+  # Total effects
+  total_GAD := c1 + (a * b1)
+  total_malaise := c2 + (a * b2)
+'
+
+SEM_fit <- sem(sem_model, data = clean)
+summary(SEM_fit, standardized = TRUE)
+```
+# Path diagram
+```{r}
+cat("The DAG diagram showing relationships between variables")
+dag <- dagitty("dag {
+  covid_positive -> LONELY
+  covid_positive -> GAD
+  covid_positive -> malaise
+  LONELY -> GAD
+  LONELY -> malaise
+}")
+plot(dag)
+cat("The SEM model-based path diagram.")
+semPaths(SEM_fit, whatLabels = "est", nodeLabels = c("Had COVID", "Loneliness", "GAD", "Malaise"), edge.label.cex = 0.8)
+```
+
+
