@@ -1,5 +1,5 @@
 ---
-title: "Code1"
+title: "How does COVID and loneliness affect mental health?"
 output:
   html_document:
     df_print: paged
@@ -264,7 +264,7 @@ cat("\n=== CORRELATION MATRICES BY WAVE ===\n")
 
 cor_matrices <- list()
 for(w in 1:3) {
-  wave_data <- clean
+  wave_data <- clean %>% filter(wave == w)  # <-- FILTERS by wave!
   cor_vars <- c("GHQ", "malaise", "GAD", "LONELY", "covid_positive", "hospitalise")
   cor_matrix <- cor(wave_data[cor_vars], use = "pairwise.complete.obs")
   rownames(cor_matrix) <- colnames(cor_matrix) <- c(
@@ -274,7 +274,7 @@ for(w in 1:3) {
   )
   cor_matrices[[paste0("Wave", w)]] <- cor_matrix
 }
-print(cor_matrices)
+
 
 library(reshape2)
 
@@ -294,8 +294,8 @@ for(w in 1:3) {
     theme(
       axis.text.x = element_text(angle = 45, hjust = 1),
       plot.title = element_text(hjust = 0.5)
-    )}
-cor_plot
+    )
+  print(cor_plot)}
 ```
 ## 6. MISSING DATA ANALYSIS
 ```{r}
