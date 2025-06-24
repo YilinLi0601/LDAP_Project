@@ -98,7 +98,6 @@ long <- bind_rows(wave1_com, wave2_com, wave3_com)
 # Changing labels, calculating values
 
 ```{r}
-str(long$COVID19)
 long <- long %>%
   mutate(covid_positive = case_when(
       COVID19 == 1 ~ 1,
@@ -127,7 +126,6 @@ clean <- long %>%
 # Descriptive Stats
 ## 1. OVERALL SAMPLE CHARACTERISTICS
 ```{r}
-# 1. OVERALL SAMPLE CHARACTERISTICS
 cat("=== OVERALL SAMPLE CHARACTERISTICS ===\n")
 cat("Total observations:", nrow(clean), "\n")
 cat("Unique participants:", length(unique(clean$NCDSID)), "\n")
@@ -136,7 +134,6 @@ print(table(clean$wave))
 ```
 ## 2. DESCRIPTIVE STATISTICS BY WAVE
 ```{r}
-# 2. DESCRIPTIVE STATISTICS BY WAVE
 cat("\n=== DESCRIPTIVE STATISTICS BY WAVE ===\n")
 
 # Function to calculate descriptive stats
@@ -166,7 +163,7 @@ desc_by_wave <- clean %>%
 
 # Rename columns for better display
 colnames(desc_by_wave) <- gsub("GHQ", "General Health Questionnaire", colnames(desc_by_wave))
-colnames(desc_by_wave) <- gsub("malaise", "Post COVID-19 Symptoms", colnames(desc_by_wave))
+colnames(desc_by_wave) <- gsub("malaise", "Malaise", colnames(desc_by_wave))
 colnames(desc_by_wave) <- gsub("GAD", "Generalised Anxiety Disorder", colnames(desc_by_wave))
 colnames(desc_by_wave) <- gsub("LONELY", "Loneliness Scale", colnames(desc_by_wave))
 
@@ -175,7 +172,6 @@ print(desc_by_wave)
 ```
 ## 3. CATEGORICAL VARIABLES BY WAVE
 ```{r}
-# 3. CATEGORICAL VARIABLES BY WAVE
 cat("\n=== CATEGORICAL VARIABLES BY WAVE ===\n")
 
 # COVID-19 positive cases by wave
@@ -218,7 +214,6 @@ print(hhnum_summary)
 ```
 ## 4. DETAILED FREQUENCY TABLES
 ```{r}
-# 4. DETAILED FREQUENCY TABLES
 cat("\n=== DETAILED FREQUENCY TABLES ===\n")
 
 # GHQ scores by wave
@@ -265,8 +260,6 @@ print(gad_freq)
 ```
 ## 5. CORRELATION MATRIX BY WAVE
 ```{r}
-
-# 5. CORRELATION MATRIX BY WAVE
 cat("\n=== CORRELATION MATRICES BY WAVE ===\n")
 
 cor_matrices <- list()
@@ -275,17 +268,37 @@ for(w in 1:3) {
   cor_vars <- c("GHQ", "malaise", "GAD", "LONELY", "covid_positive", "hospitalise")
   cor_matrix <- cor(wave_data[cor_vars], use = "pairwise.complete.obs")
   rownames(cor_matrix) <- colnames(cor_matrix) <- c(
-    "General Health Questionnaire", "Post COVID-19 Symptoms", 
+    "General Health Questionnaire", "Malaise", 
     "Generalised Anxiety Disorder", "Loneliness Scale", 
     "Covid Positive", "Hospitalised"
   )
   cor_matrices[[paste0("Wave", w)]] <- cor_matrix
 }
 print(cor_matrices)
+
+library(reshape2)
+
+for(w in 1:3) {
+  cor_matrix <- cor_matrices[[paste0("Wave", w)]]
+  melted_cor <- melt(cor_matrix)
+  
+  cor_plot <- ggplot(melted_cor, aes(Var1, Var2, fill = value)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
+                         midpoint = 0, limit = c(-1, 1), name = "r") +
+    labs(
+      title = paste("Correlation Matrix: Wave", w),
+      x = NULL, y = NULL
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5)
+    )}
+cor_plot
 ```
 ## 6. MISSING DATA ANALYSIS
 ```{r}
-# 6. MISSING DATA ANALYSIS
 cat("\n=== MISSING DATA ANALYSIS ===\n")
 missing_analysis <- clean %>%
   group_by(wave) %>%
@@ -306,7 +319,6 @@ print(missing_analysis)
 ```
 ## 7. SUMMARY TABLE FOR PUBLICATION
 ```{r}
-# 7. SUMMARY TABLE FOR PUBLICATION
 cat("\n=== PUBLICATION-READY SUMMARY TABLE ===\n")
 pub_table <- clean %>%
   group_by(wave) %>%
@@ -338,6 +350,9 @@ pub_table <- clean %>%
 
 print(pub_table)
 
+
+  
+
 cat("\n=== ANALYSIS COMPLETE ===\n")
 cat("This comprehensive descriptive analysis provides:\n")
 cat("1. Overall sample characteristics\n")
@@ -349,15 +364,41 @@ cat("6. Missing data analysis\n")
 cat("7. Publication-ready summary table\n")
 ```
 
+## Visualising descriptive stats
 ```{r}
-library(knitr)
-ggplot(clean, 
-             aes(x = wave, y = GAD)) +
-  geom_violin(alpha = 0.1) +
-  stat_summary()
-
-
-
+means_tbl <- clean %>%
+  group_by(wave) %>%
+  summarise(
+    GHQ_mean = mean(GHQ, na.rm = TRUE),
+    GHQ_sd = sd(GHQ, na.rm = TRUE),
+    malaise_mean = mean(malaise, na.rm = TRUE),
+    malaise_sd = sd(malaise, na.rm = TRUE),
+    GAD_mean = mean(GAD, na.rm = TRUE),
+    GAD_sd = sd(GAD, na.rm = TRUE),
+    LONELY_mean = mean(LONELY, na.rm = TRUE),
+    LONELY_sd = sd(LONELY, na.rm = TRUE)
+  )
+plot_tbl_long <- means_tbl %>%
+  pivot_longer(
+    cols = ends_with("_mean"),
+    names_to = "Outcome",
+    names_pattern = "(.*)_mean",
+    values_to = "Mean"
+  ) %>%
+  mutate(SD = case_when(
+    Outcome == "GHQ" ~ GHQ_sd,
+    Outcome == "malaise" ~ malaise_sd,
+    Outcome == "GAD" ~ GAD_sd,
+    Outcome == "LONELY" ~ LONELY_sd
+  ))
+des_plot <- ggplot(plot_tbl_long, aes(x = as.factor(wave), y = Mean, group = Outcome, color = Outcome)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.1) +
+  labs(title = "Trends in Mental Health by Wave",
+       x = "Wave", y = "Mean (±SD)") +
+  theme_minimal()
+des_plot
 ```
 
 
@@ -365,12 +406,12 @@ ggplot(clean,
 
 ## Hypothesis 1: Having COVID will predict poorer mental health
 ## Hypothesis 2: COVID severity predicts poorer mental health
+
+## 1. DESCRIPTIVE COMPARISONS: COVID vs NO-COVID
 ```{r}
 cat("=== COVID-19 AND MENTAL HEALTH PREDICTIVE ANALYSIS ===\n\n")
 
-# 1. DESCRIPTIVE COMPARISONS: COVID vs NO-COVID
 cat("1. DESCRIPTIVE COMPARISONS BY COVID STATUS\n")
-cat("=========================================\n")
 
 # Create comparison table
 covid_comparison <- clean %>%
@@ -383,7 +424,7 @@ covid_comparison <- clean %>%
     `General Health Questionnaire` = paste0(round(mean(GHQ, na.rm = TRUE), 2), " (", 
                                            round(sd(GHQ, na.rm = TRUE), 2), ")"),
     
-    `Post COVID-19 Symptoms` = paste0(round(mean(malaise, na.rm = TRUE), 2), " (", 
+    `Malaise` = paste0(round(mean(malaise, na.rm = TRUE), 2), " (", 
                                      round(sd(malaise, na.rm = TRUE), 2), ")"),
     
     `Generalised Anxiety Disorder` = paste0(round(mean(GAD, na.rm = TRUE), 2), " (", 
@@ -401,14 +442,15 @@ covid_comparison <- clean %>%
 
 print(covid_comparison)
 
+
+
 ```
 ## 2. SIMPLE T-TESTS FOR EACH MENTAL HEALTH OUTCOME
 ```{r}
 cat("\n\n2. T-TESTS: COVID POSITIVE vs COVID NEGATIVE\n")
-cat("===========================================\n")
 
 mental_health_vars <- c("GHQ", "malaise", "GAD", "LONELY")
-var_labels <- c("General Health Questionnaire", "Post COVID-19 Symptoms", 
+var_labels <- c("General Health Questionnaire", "Malaise", 
                 "Generalised Anxiety Disorder", "Loneliness Scale")
 
 ttest_results <- tibble()
@@ -452,7 +494,6 @@ print(ttest_results)
 ## 3. LONGITUDINAL MIXED-EFFECTS MODELS
 ```{r}
 cat("\n\n3. MIXED-EFFECTS MODELS: LONGITUDINAL ANALYSIS\n")
-cat("==============================================\n")
 
 # Create models for each mental health outcome
 mixed_model_results <- tibble()
@@ -517,6 +558,29 @@ for(i in 1:length(mental_health_vars)) {
 }
 
 print(mixed_model_results)
+
+mixed_model_results <- mixed_model_results %>%
+  mutate(
+    sig = case_when(
+      COVID_p_value < 0.001 ~ "***",
+      COVID_p_value < 0.01 ~ "**",
+      COVID_p_value < 0.05 ~ "*",
+      TRUE ~ ""
+    )
+  )
+longi_plot <- ggplot(mixed_model_results, 
+       aes(x = COVID_Coefficient, y = Variable, color = Model)) +
+  geom_point(position = position_dodge(width = 0.6), size = 2) +
+  geom_errorbarh(aes(xmin = COVID_CI_lower, xmax = COVID_CI_upper), 
+                 height = 0.2, position = position_dodge(width = 0.6)) +
+  geom_text(aes(label = sig), 
+            position = position_dodge(width = 0.6), 
+            hjust = -0.5, vjust = 0.5, size = 6) +  # adjusts text position and size
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  labs(title = "Effect of COVID on Mental Health Outcomes (Mixed-Effects Models)",
+       x = "COVID Coefficient (β)", y = "Mental Health Outcome", color = "Model") +
+  theme_minimal(base_size = 14)
+longi_plot
 ```
 ## 4. TIMING ANALYSIS: WHEN DO EFFECTS APPEAR?
 ```{r}
@@ -562,7 +626,6 @@ print(wave_analysis)
 ## 5. HOSPITALIZATION AS SEVERITY INDICATOR
 ```{r}
 cat("\n\n5. DOSE-RESPONSE ANALYSIS: COVID SEVERITY EFFECTS\n")
-cat("================================================\n")
 
 # Create COVID severity groups
 clean_severity <- clean %>%
@@ -610,7 +673,6 @@ for(i in 1:length(mental_health_vars)) {
 ## 6. SUMMARY AND INTERPRETATION
 ```{r}
 cat("\n\n6. SUMMARY AND INTERPRETATION\n")
-cat("=============================\n")
 
 cat("Key Findings:\n")
 cat("1. Descriptive comparisons show mean differences between COVID+ and COVID- groups\n")
@@ -633,7 +695,7 @@ cat("4. Consider lagged effects (COVID in wave X predicting MH in wave X+1)\n")
 
 cat("\n=== ANALYSIS COMPLETE ===\n")
 ```
-# Hypothesis 3: Lonliness is a mediator between the relationship of COVID positivity and mental health (general anxiety & malaise).
+# Hypothesis 3: Lonliness and hospitalisation (COVID severity) are mediators between the relationship of COVID positivity and mental health (general anxiety & malaise).
 # SEM model with mediation
 ```{r}
 cat("Running SEM analysis to explore direct effect (COVID positive on loneliness, anxiety and malaise.")
@@ -658,10 +720,31 @@ sem_model <- '
 
 SEM_fit <- sem(sem_model, data = clean)
 summary(SEM_fit, standardized = TRUE)
+
+cat("The second SEM model adding in hospitalisation as a second predictor.")
+
+sem_model_2 <- '
+  # Predictors
+  LONELY ~ a1 * covid_positive + a2 * hospitalise
+  GAD ~ b1 * LONELY + c1 * covid_positive + c2 * hospitalise
+  malaise ~ b2 * LONELY + d1 * covid_positive + d2 * hospitalise
+
+  # Indirect effects
+  indirect_GAD := a1 * b1
+  indirect_GAD_hosp := a2 * b1
+  indirect_malaise := a1 * b2
+  indirect_malaise_hosp := a2 * b2
+
+  # Total effects
+  total_GAD := c1 + (a1 * b1) + c2 + (a2 * b1)
+  total_malaise := d1 + (a1 * b2) + d2 + (a2 * b2)
+'
+SEM_fit_2 <- sem(sem_model_2, data = clean)
+summary(SEM_fit_2, standardized = TRUE)
 ```
 # Path diagram
 ```{r}
-cat("The DAG diagram showing relationships between variables")
+cat("The DAG diagram showing relationships between variables in SEM model 1")
 dag <- dagitty("dag {
   covid_positive -> LONELY
   covid_positive -> GAD
@@ -670,8 +753,30 @@ dag <- dagitty("dag {
   LONELY -> malaise
 }")
 plot(dag)
-cat("The SEM model-based path diagram.")
+cat("The SEM model1-based path diagram.")
 semPaths(SEM_fit, whatLabels = "est", nodeLabels = c("Had COVID", "Loneliness", "GAD", "Malaise"), edge.label.cex = 0.8)
+
+cat("The DAG diagram of SEM model 2 which added hospitalisation as a separate predictor.")
+
+dag2 <- dagitty("dag {
+  covid_positive -> hospitalise
+  covid_positive -> LONELY
+  covid_positive -> GAD
+  covid_positive -> malaise
+  hospitalise -> LONELY
+  hospitalise -> GAD
+  hospitalise -> malaise
+  LONELY -> GAD
+  LONELY -> malaise
+}")
+plot(dag2)
+
+cat("The path diagram adding in Hospitalisation as a mediator.")
+myLabels <- c("Had COVID", "Hospitalised", "Loneliness", "GAD", "Malaise")
+SEM2 <- semPaths(SEM_fit_2, whatLabels = "est", nodeLabels = myLabels, edge.label.cex = 0.8)
+SEM2
+
+
 ```
 
 
