@@ -109,6 +109,42 @@ long <- long %>%
     COVID_HOSPAD == 2 ~ 0,
     COVID_HOSPAD == 1 ~ 1
   )) %>%
+  mutate(MALAISE_1 = case_when(
+    MALAISE_1 == 2 ~ 0,
+    MALAISE_1 == 1 ~ 1
+  )) %>%
+  mutate(MALAISE_2 = case_when(
+    MALAISE_2 == 2 ~ 0,
+    MALAISE_2 == 1 ~ 1
+  )) %>%
+  mutate(MALAISE_3 = case_when(
+    MALAISE_3 == 2 ~ 0,
+    MALAISE_3 == 1 ~ 1
+  )) %>%
+  mutate(MALAISE_4 = case_when(
+    MALAISE_4 == 2 ~ 0,
+    MALAISE_4 == 1 ~ 1
+  )) %>%
+  mutate(MALAISE_5 = case_when(
+    MALAISE_5 == 2 ~ 0,
+    MALAISE_5 == 1 ~ 1
+  )) %>%
+  mutate(MALAISE_6 = case_when(
+    MALAISE_6 == 2 ~ 0,
+    MALAISE_6 == 1 ~ 1
+  )) %>%
+  mutate(MALAISE_7 = case_when(
+    MALAISE_7 == 2 ~ 0,
+    MALAISE_7 == 1 ~ 1
+  )) %>%
+  mutate(MALAISE_8 = case_when(
+    MALAISE_8 == 2 ~ 0,
+    MALAISE_8 == 1 ~ 1
+  )) %>%
+  mutate(MALAISE_9 = case_when(
+    MALAISE_9 == 2 ~ 0,
+    MALAISE_9 == 1 ~ 1
+  )) %>%
   rowwise() %>%
   mutate(malaise = sum(MALAISE_1, MALAISE_2, MALAISE_3, MALAISE_4, MALAISE_5, MALAISE_6, MALAISE_7, MALAISE_8, MALAISE_9, na.rm = FALSE)) %>%
   rowwise() %>%
@@ -118,6 +154,10 @@ long <- long %>%
   mutate(
     LONELY = sum(LONELY_1, LONELY_2, LONELY_3, LONELY_4)
   )
+
+```
+
+```{r}
 clean <- long %>%
   dplyr::select(NCDSID, GHQ, HHNUM, wave, covid_positive, hospitalise, malaise, GAD, LONELY)
 # Finalised dataframe for multi-level analysis: clean
@@ -777,6 +817,59 @@ SEM2 <- semPaths(SEM_fit_2, whatLabels = "est", nodeLabels = myLabels, edge.labe
 SEM2
 
 
+```
+## Exploring longitudinal effects
+```{r}
+wide_data <- clean %>%
+  pivot_wider(
+    id_cols = NCDSID,
+    names_from = wave,
+    values_from = c(GAD, LONELY, malaise, covid_positive, hospitalise)
+  )
+longi_sem_model <- '
+  # Autoregressive paths
+  GAD_2 ~ GAD_1
+  GAD_3 ~ GAD_2
+  LONELY_2 ~ LONELY_1
+  LONELY_3 ~ LONELY_2
+  malaise_2 ~ malaise_1
+  malaise_3 ~ malaise_2
+
+  # Predictors at each wave
+  GAD_1 ~ covid_positive_1 + hospitalise_1 + LONELY_1 + malaise_1
+  GAD_2 ~ covid_positive_2 + hospitalise_2 + LONELY_2 + malaise_2
+  GAD_3 ~ covid_positive_3 + hospitalise_3 + LONELY_3 + malaise_3
+
+  malaise_1 ~ covid_positive_1 + hospitalise_1 + LONELY_1 + GAD_1
+  malaise_2 ~ covid_positive_2 + hospitalise_2 + LONELY_2 + GAD_2
+  malaise_3 ~ covid_positive_3 + hospitalise_3 + LONELY_3 + GAD_3
+
+  LONELY_1 ~ covid_positive_1 + hospitalise_1
+  LONELY_2 ~ covid_positive_2 + hospitalise_2
+  LONELY_3 ~ covid_positive_3 + hospitalise_3
+
+  # Cross-lagged effects (optional: if you want prior LONELY predicting later GAD)
+  GAD_2 ~ LONELY_1
+  GAD_3 ~ LONELY_2
+  malaise_2 ~ LONELY_1
+  malaise_3 ~ LONELY_2'
+
+longi_fit <- sem(longi_sem_model, data = wide_data, missing = "fiml")
+summary(longi_fit, standardized = TRUE)
+
+```
+
+## Generating path diagram for longitudinal SEM model.
+```{r}
+mod <- semPlot::semPlotModel(longi_fit)
+mod@Vars$name
+nodeLabels <- c(
+  "GAD (W2)", "GAD (W3)", "Loneliness (W2)", "Loneliness (W3)",
+  "Malaise (W2)", "Malaise (W3)", "GAD (W1)", "Malaise (W1)",
+  "Loneliness (W1)", "COVID+ (W1)", "Hospitalised (W1)",
+  "COVID+ (W2)", "Hospitalised (W2)", "COVID+ (W3)", "Hospitalised (W3)"
+)
+semPaths(longi_fit, whatLabels = "std", layout = "tree", border = FALSE, sizeMan = 5, edge.label.cex = 0.8)
 ```
 
 
