@@ -859,6 +859,59 @@ summary(longi_fit, standardized = TRUE)
 
 ```
 
+
+## Generating a DAG diagram of longitudinal effect
+```{r}
+
+library(ggdag)
+
+longi_dag <- dagitty('
+dag {
+  covid1 -> lonely1
+  covid1 -> gad1
+  covid1 -> malaise1
+  hospital1 -> lonely1
+  hospital1 -> gad1
+  hospital1 -> malaise1
+  lonely1 -> gad1
+  lonely1 -> malaise1
+
+  covid2 -> lonely2
+  covid2 -> gad2
+  covid2 -> malaise2
+  hospital2 -> lonely2
+  hospital2 -> gad2
+  hospital2 -> malaise2
+  lonely2 -> gad2
+  lonely2 -> malaise2
+
+  covid3 -> lonely3
+  covid3 -> gad3
+  covid3 -> malaise3
+  hospital3 -> lonely3
+  hospital3 -> gad3
+  hospital3 -> malaise3
+  lonely3 -> gad3
+  lonely3 -> malaise3
+
+  gad1 -> gad2
+  gad2 -> gad3
+  lonely1 -> lonely2
+  lonely2 -> lonely3
+  malaise1 -> malaise2
+  malaise2 -> malaise3
+
+  lonely1 -> gad2
+  lonely2 -> gad3
+  gad1 -> lonely2
+  gad2 -> lonely3
+}
+')
+
+ggdag(longi_dag, text = FALSE, use_labels = "name", layout = "tree")
+
+```
+
 ## Generating path diagram for longitudinal SEM model.
 ```{r}
 mod <- semPlot::semPlotModel(longi_fit)
@@ -869,7 +922,9 @@ nodeLabels <- c(
   "Loneliness (W1)", "COVID+ (W1)", "Hospitalised (W1)",
   "COVID+ (W2)", "Hospitalised (W2)", "COVID+ (W3)", "Hospitalised (W3)"
 )
+#I can't add this node labels in.
 semPaths(longi_fit, whatLabels = "std", layout = "tree", border = FALSE, sizeMan = 5, edge.label.cex = 0.8)
+
 ```
 
 
