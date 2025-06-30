@@ -7,14 +7,14 @@ output:
 date: "2025-05-06"
 ---
 
-# Settings
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(warning = FALSE)
 ```
 
-# Reading data frames
+
 
 ```{r}
 library(foreign)
@@ -32,6 +32,7 @@ library(knitr)
 library(haven)
 library("dagitty")
 library("semPlot")
+library("lavaanPlot")
 setwd("~/Desktop/LDAP_Project")
 covid_19_wave1_survey_cls <- read_sav("covid-19_wave1_survey_cls.sav")
 wave1 <- covid_19_wave1_survey_cls
@@ -41,7 +42,7 @@ covid_19_wave3_survey_cls <- read_sav("covid-19_wave3_survey_cls.sav")
 wave3 <- covid_19_wave3_survey_cls
 ```
 
-# Picking variables
+
 
 ```{r}
 wave1 <- wave1 %>%
@@ -52,7 +53,7 @@ wave3 <- wave3 %>%
   dplyr::select(NCDSID, CW3_COVID19, CW3_COVID_HOSPAD, CW3_GHQ, CW3_HHNUM, CW3_MALAISE_1, CW3_MALAISE_2, CW3_MALAISE_3, CW3_MALAISE_4, CW3_MALAISE_5, CW3_MALAISE_6, CW3_MALAISE_7, CW3_MALAISE_8, CW3_MALAISE_9, CW3_GAD2PHQ2_1, CW3_GAD2PHQ2_2, CW3_GAD2PHQ2_3, CW3_GAD2PHQ2_4, CW3_LONELY_1, CW3_LONELY_2, CW3_LONELY_3, CW3_LONELY_4)
 ```
 
-# Data cleaning
+
 
 ```{r}
 wave1 <- wave1 %>%
@@ -63,7 +64,7 @@ wave3 <- wave3 %>%
   filter(NCDSID != "")
 ```
 
-# Data filtering
+
 
 ```{r}
 common_ids <- reduce(list(wave1$NCDSID, wave2$NCDSID, wave3$NCDSID), intersect)
@@ -75,7 +76,7 @@ wave3_com <- wave3 %>%
   filter(NCDSID %in% common_ids)
 ```
 
-# Specifying waves and long format
+
 
 ```{r}
 wave1_com <- wave1_com %>%
@@ -95,7 +96,7 @@ long <- bind_rows(wave1_com, wave2_com, wave3_com)
 
 ```
 
-# Changing labels, calculating values
+
 
 ```{r}
 long <- long %>%
@@ -761,6 +762,20 @@ sem_model <- '
 SEM_fit <- sem(sem_model, data = clean)
 summary(SEM_fit, standardized = TRUE)
 
+cat("The DAG diagram showing relationships between variables in SEM model 1")
+dag <- dagitty("dag {
+  covid_positive -> LONELY
+  covid_positive -> GAD
+  covid_positive -> malaise
+  LONELY -> GAD
+  LONELY -> malaise
+}")
+plot(dag)
+cat("The SEM model1-based path diagram.")
+semPaths(SEM_fit, whatLabels = "est", nodeLabels = c("Had COVID", "Loneliness", "GAD", "Malaise"), edge.label.cex = 0.8)
+```
+
+```{r}
 cat("The second SEM model adding in hospitalisation as a second predictor.")
 
 sem_model_2 <- '
@@ -781,20 +796,6 @@ sem_model_2 <- '
 '
 SEM_fit_2 <- sem(sem_model_2, data = clean)
 summary(SEM_fit_2, standardized = TRUE)
-```
-# Path diagram
-```{r}
-cat("The DAG diagram showing relationships between variables in SEM model 1")
-dag <- dagitty("dag {
-  covid_positive -> LONELY
-  covid_positive -> GAD
-  covid_positive -> malaise
-  LONELY -> GAD
-  LONELY -> malaise
-}")
-plot(dag)
-cat("The SEM model1-based path diagram.")
-semPaths(SEM_fit, whatLabels = "est", nodeLabels = c("Had COVID", "Loneliness", "GAD", "Malaise"), edge.label.cex = 0.8)
 
 cat("The DAG diagram of SEM model 2 which added hospitalisation as a separate predictor.")
 
@@ -811,13 +812,13 @@ dag2 <- dagitty("dag {
 }")
 plot(dag2)
 
-cat("The path diagram adding in Hospitalisation as a mediator.")
+cat("The path diagram adding in Hospitalisation as a mediator (SEM model2).")
 myLabels <- c("Had COVID", "Hospitalised", "Loneliness", "GAD", "Malaise")
 SEM2 <- semPaths(SEM_fit_2, whatLabels = "est", nodeLabels = myLabels, edge.label.cex = 0.8)
 SEM2
-
-
 ```
+
+
 ## Exploring longitudinal effects
 ```{r}
 wide_data <- clean %>%
@@ -916,15 +917,70 @@ ggdag(longi_dag, text = FALSE, use_labels = "name", layout = "tree")
 ```{r}
 mod <- semPlot::semPlotModel(longi_fit)
 mod@Vars$name
-nodeLabels <- c(
-  "GAD (W2)", "GAD (W3)", "Loneliness (W2)", "Loneliness (W3)",
-  "Malaise (W2)", "Malaise (W3)", "GAD (W1)", "Malaise (W1)",
-  "Loneliness (W1)", "COVID+ (W1)", "Hospitalised (W1)",
-  "COVID+ (W2)", "Hospitalised (W2)", "COVID+ (W3)", "Hospitalised (W3)"
-)
-#I can't add this node labels in.
+
 semPaths(longi_fit, whatLabels = "std", layout = "tree", border = FALSE, sizeMan = 5, edge.label.cex = 0.8)
+
 
 ```
 
+# Splitting the plot by variables
+
+## GAD plot
+```{r}
+model_gad_long <- '
+  GAD_1 ~ covid_positive_1 + hospitalise_1 + LONELY_1
+  GAD_2 ~ GAD_1 + covid_positive_2 + hospitalise_2 + LONELY_2
+  GAD_3 ~ GAD_2 + covid_positive_3 + hospitalise_3 + LONELY_3'
+fit_gad_long <- sem(model_gad_long, data = wide_data)
+lavaanPlot(
+  model = fit_gad_long,
+  coefs = TRUE,
+  stand = TRUE,
+  stars = "regress",
+  node_options = list(fontsize = 12, fontname = "Helvetica"),
+  edge_options = list(fontsize = 10),
+  graph_options = list(rankdir = "LR")
+)
+```
+## Malaise plot
+```{r}
+model_malaise_long <- '
+  malaise_1 ~ covid_positive_1 + hospitalise_1 + LONELY_1
+  malaise_2 ~ malaise_1 + covid_positive_2 + hospitalise_2 + LONELY_2
+  malaise_3 ~ malaise_2 + covid_positive_3 + hospitalise_3 + LONELY_3
+'
+fit_malaise_long <- sem(model_malaise_long, data = wide_data)
+lavaanPlot(
+  model = fit_malaise_long,
+  coefs = TRUE, stand = TRUE, stars = "regress",
+  labels = c(
+    malaise_1 = "Malaise (W1)", malaise_2 = "Malaise (W2)", malaise_3 = "Malaise (W3)",
+    covid_positive_1 = "COVID+ (W1)", hospitalise_1 = "Hosp (W1)", LONELY_1 = "Lonely (W1)",
+    covid_positive_2 = "COVID+ (W2)", hospitalise_2 = "Hosp (W2)", LONELY_2 = "Lonely (W2)",
+    covid_positive_3 = "COVID+ (W3)", hospitalise_3 = "Hosp (W3)", LONELY_3 = "Lonely (W3)"
+  ),
+  node_options = list(fontsize = 12), edge_options = list(fontsize = 10)
+)
+```
+## Loneliness
+```{r}
+model_lonely_long <- '
+  LONELY_1 ~ covid_positive_1 + hospitalise_1
+  LONELY_2 ~ LONELY_1 + covid_positive_2 + hospitalise_2
+  LONELY_3 ~ LONELY_2 + covid_positive_3 + hospitalise_3
+'
+fit_lonely_long <- sem(model_lonely_long, data = wide_data)
+
+lavaanPlot(
+  model = fit_lonely_long,
+  coefs = TRUE, stand = TRUE, stars = "regress",
+  labels = c(
+    LONELY_1 = "Lonely (W1)", LONELY_2 = "Lonely (W2)", LONELY_3 = "Lonely (W3)",
+    covid_positive_1 = "COVID+ (W1)", hospitalise_1 = "Hosp (W1)",
+    covid_positive_2 = "COVID+ (W2)", hospitalise_2 = "Hosp (W2)",
+    covid_positive_3 = "COVID+ (W3)", hospitalise_3 = "Hosp (W3)"
+  ),
+  node_options = list(fontsize = 12), edge_options = list(fontsize = 10)
+)
+```
 
